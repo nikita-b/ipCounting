@@ -97,16 +97,17 @@ func ProcessFileConcurrency(ipc IPCounter, file *os.File, progress *ProgressTrac
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			batch := make([]uint32, 0, 100) // Batch size of 100
+			batchSize := 100
+			batch := make([]uint32, 0, batchSize) // Batch size of 100
 			for ipInt := range ipAddrQueue {
 				batch = append(batch, ipInt)
-				if len(batch) >= 100 {
-					ipc.AddConcurrent(batch, i)
-					batch = make([]uint32, 0, 100)
+				if len(batch) >= batchSize {
+					ipc.AddConcurrent(&batch, i)
+					batch = batch[:0]
 				}
 			}
 			if len(batch) > 0 {
-				ipc.AddConcurrent(batch, i)
+				ipc.AddConcurrent(&batch, i)
 			}
 		}()
 	}

@@ -18,7 +18,7 @@ func (ipc *IPCounterRoaring) Add(ipAddrRepresentation uint32) {
 	ipc.bitmap.Add(ipAddrRepresentation)
 }
 
-func (ipc *IPCounterRoaring) AddConcurrent(ipAddrRepresentation []uint32, workerId int) {
+func (ipc *IPCounterRoaring) AddConcurrent(ipAddrRepresentation *[]uint32, workerId int) {
 	// empty
 }
 
