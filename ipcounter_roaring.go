@@ -18,6 +18,10 @@ func (ipc *IPCounterRoaring) Add(ipAddrRepresentation uint32) {
 	ipc.bitmap.Add(ipAddrRepresentation)
 }
 
+func (ipc *IPCounterRoaring) AddConcurrent(ipAddrRepresentation []uint32, workerId int) {
+	// empty
+}
+
 func (ipc *IPCounterRoaring) Count() uint64 {
 	return ipc.bitmap.GetCardinality()
 }

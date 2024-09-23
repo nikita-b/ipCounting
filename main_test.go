@@ -61,9 +61,9 @@ func TestIPCounterRoaring(t *testing.T) {
 func TestIPCounterConcurrentBasic(t *testing.T) {
 	expectedUniqueCount := uint64(4)
 	fileName, err := os.Open("resources/ip_addresses_basic.txt")
-	var ipc = NewBitmapConcurrent()
+	var ipc = NewBitmapConcurrent(2)
 	var pt = NewProgressTracker(0)
-	err = ProcessFileConcurrency(ipc, fileName, pt)
+	err = ProcessFileConcurrency(ipc, fileName, pt, 2)
 	if err != nil {
 		t.Fatalf("Error processing file: %v", err)
 	}
@@ -114,9 +114,9 @@ func TestIPCounterRoaringFull(t *testing.T) {
 func TestIPCounterConcurrentFull(t *testing.T) {
 	expectedUniqueCount := expectedFromENV
 	fileName, err := os.Open("resources/generated_ip_addresses.txt")
-	var ipc = NewBitmapConcurrent()
+	var ipc = NewBitmapConcurrent(2)
 	var pt = NewProgressTracker(0)
-	err = ProcessFileConcurrency(ipc, fileName, pt)
+	err = ProcessFileConcurrency(ipc, fileName, pt, 2)
 	if err != nil {
 		t.Fatalf("Error processing file: %v", err)
 	}

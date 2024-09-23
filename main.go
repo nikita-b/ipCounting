@@ -28,6 +28,7 @@ func timer() func() {
 var profile = flag.Bool("profile", false, "Enable profiling")
 var filename = flag.String("filename", "", "Path to file with IPs")
 var algo = flag.Int("algo", int(Bitmap), "Algorithm to use: 0: Bitmap, 1: BitmapRoaring, 2: ConcurrentBitmap")
+var concurrency = flag.Int("concurrency", 5, "Number of workers for concurrent algorithm")
 
 func main() {
 	defer timer()()
@@ -66,7 +67,7 @@ func main() {
 	case int(BitmapRoaring):
 		ipCounter = NewBitmapRoaringIPCounter()
 	case int(ConcurrentBitmap):
-		ipCounter = NewBitmapConcurrent()
+		ipCounter = NewBitmapConcurrent(*concurrency)
 	default:
 		log.Fatalf("Unknown algorithm: %d\n", *algo)
 	}
@@ -77,7 +78,7 @@ func main() {
 			log.Fatalf("Error processing file: %v\n", err)
 		}
 	} else {
-		err = ProcessFileConcurrency(ipCounter, file, progress)
+		err = ProcessFileConcurrency(ipCounter, file, progress, *concurrency)
 		if err != nil {
 			log.Fatalf("Error processing file: %v\n", err)
 		}

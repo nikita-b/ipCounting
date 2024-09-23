@@ -12,6 +12,7 @@ const (
 type IPCounter interface {
 	Count() uint64
 	Add(ipAddr uint32)
+	AddConcurrent(ipAddr []uint32, workerId int)
 }
 
 type IPCounterBitMap struct {
@@ -28,6 +29,10 @@ func (ipc *IPCounterBitMap) Add(ipAddrRepresentation uint32) {
 	chunkNumber := ipAddrRepresentation / bitesIn64Int
 	positionInChunk := ipAddrRepresentation % bitesIn64Int
 	ipc.bitmap[chunkNumber] |= 1 << positionInChunk
+}
+
+func (ipc *IPCounterBitMap) AddConcurrent(ipAddrRepresentation []uint32, workerId int) {
+	// empty
 }
 
 func (ipc *IPCounterBitMap) Count() uint64 {

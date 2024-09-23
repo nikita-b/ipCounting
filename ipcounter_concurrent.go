@@ -1,33 +1,30 @@
 package main
 
 import (
-	"math/bits"
-	"sync/atomic"
+	"github.com/RoaringBitmap/roaring/v2"
 )
 
 type IPCounterConcurrent struct {
-	bitmap []uint64
+	bitmap      []roaring.Bitmap
+	concurrency int
 }
 
-func NewBitmapConcurrent() *IPCounterConcurrent {
+func NewBitmapConcurrent(concurrency int) *IPCounterConcurrent {
 	return &IPCounterConcurrent{
-		bitmap: make([]uint64, totalPossibleIpAddresses/bitesIn64Int),
+		bitmap:      make([]roaring.Bitmap, concurrency),
+		concurrency: concurrency,
 	}
+}
+
+func (ipc *IPCounterConcurrent) AddConcurrent(ipAddrRepresentation []uint32, workerId int) {
+	ipc.bitmap[workerId].AddMany(ipAddrRepresentation)
 }
 
 func (ipc *IPCounterConcurrent) Add(ipAddrRepresentation uint32) {
-	chunkNumber := ipAddrRepresentation / bitesIn64Int
-	positionInChunk := ipAddrRepresentation % bitesIn64Int
-	mask := uint64(1) << positionInChunk
-
-	addr := &ipc.bitmap[chunkNumber]
-	atomic.AddUint64(addr, mask&^atomic.LoadUint64(addr)&mask)
+	// empty
 }
 
 func (ipc *IPCounterConcurrent) Count() uint64 {
-	uniqueCount := 0
-	for _, num := range ipc.bitmap {
-		uniqueCount += bits.OnesCount64(num)
-	}
-	return uint64(uniqueCount)
+	combineBitMap := roaring.ParOr(0, &ipc.bitmap[0], &ipc.bitmap[1], &ipc.bitmap[2], &ipc.bitmap[3], &ipc.bitmap[4])
+	return combineBitMap.GetCardinality()
 }

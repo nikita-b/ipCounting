@@ -66,11 +66,11 @@ func ProcessFile(ipc IPCounter, file *os.File, progress *ProgressTracker) error 
 	}
 }
 
-func ProcessFileConcurrency(ipc IPCounter, file *os.File, progress *ProgressTracker) error {
-	ipAddrQueue := make(chan uint32, 10000000) // ~4MB
+func ProcessFileConcurrency(ipc IPCounter, file *os.File, progress *ProgressTracker, concurrency int) error {
+	ipAddrQueue := make(chan uint32, 10000) // ~4MB
 
 	go func() {
-		reader := bufio.NewReader(file)
+		reader := bufio.NewReaderSize(file, 1<<10)
 		defer close(ipAddrQueue)
 		for {
 			line, err := reader.ReadString('\n')
@@ -92,14 +92,21 @@ func ProcessFileConcurrency(ipc IPCounter, file *os.File, progress *ProgressTrac
 		}
 	}()
 	var wg sync.WaitGroup
-	numWorkers := 5
 
-	for i := 0; i < numWorkers; i++ {
+	for i := 0; i < concurrency; i++ {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
+			batch := make([]uint32, 0, 100) // Batch size of 100
 			for ipInt := range ipAddrQueue {
-				ipc.Add(ipInt)
+				batch = append(batch, ipInt)
+				if len(batch) >= 100 {
+					ipc.AddConcurrent(batch, i)
+					batch = make([]uint32, 0, 100)
+				}
+			}
+			if len(batch) > 0 {
+				ipc.AddConcurrent(batch, i)
 			}
 		}()
 	}
