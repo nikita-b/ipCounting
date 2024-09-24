@@ -29,6 +29,7 @@ var profile = flag.Bool("profile", false, "Enable profiling")
 var filename = flag.String("filename", "", "Path to file with IPs")
 var algo = flag.Int("algo", int(Bitmap), "Algorithm to use: 0: Bitmap, 1: BitmapRoaring, 2: ConcurrentBitmap")
 var concurrency = flag.Int("concurrency", 5, "Number of workers for concurrent algorithm")
+var disableProgress = flag.Bool("noprogress", false, "Disable progress tracking")
 
 func main() {
 	defer timer()()
@@ -59,7 +60,9 @@ func main() {
 	totalFileSize := fileInfo.Size()
 	var ipCounter IPCounter
 	progress := NewProgressTracker(totalFileSize)
-	progress.Start()
+	if !*disableProgress {
+		progress.Start()
+	}
 
 	switch *algo {
 	case int(Bitmap):
@@ -84,7 +87,9 @@ func main() {
 		}
 	}
 
-	progress.Stop()
+	if !*disableProgress {
+		progress.Stop()
+	}
 
 	uniqueCount := ipCounter.Count()
 

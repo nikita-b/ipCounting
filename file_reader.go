@@ -41,16 +41,12 @@ func parseIP(ipStr string) (uint64, error) {
 //}
 
 func ProcessFile(ipc IPCounter, file *os.File, progress *ProgressTracker) error {
-	reader := bufio.NewReader(file)
-	for {
-		line, err := reader.ReadString('\n')
-		if err != nil && err != io.EOF {
-			return err
-		}
-		if err == io.EOF {
-			return nil
-		}
-		progress.Increase(int64(len(line)))
+	scanner := bufio.NewScanner(file)
+	buf := make([]byte, 0, 64*1024)
+	scanner.Buffer(buf, 1024*1024)
+
+	for scanner.Scan() {
+		line := scanner.Text()
 
 		ipAddrStr := strings.Trim(line, "\n")
 		ipAddr, err := parseIP(ipAddrStr)
@@ -59,7 +55,9 @@ func ProcessFile(ipc IPCounter, file *os.File, progress *ProgressTracker) error 
 			continue
 		}
 		ipc.Add(ipAddr)
+		progress.Increase(int64(len(line)))
 	}
+	return nil
 }
 
 func ProcessFileConcurrency(ipc IPCounter, file *os.File, progress *ProgressTracker, concurrency int) error {

@@ -35,7 +35,8 @@ Showing nodes accounting for 512MB, 100% of 512MB total
          0     0%   100%      512MB   100%  main.main
          0     0%   100%      512MB   100%  runtime.main
 ```
-Execution time is ~10m01s
+Execution time is ~9m01.834528875s
+[prof.svg](resources/bitmap-pprof.svg)
 
 ### Roaring bitmap:
 ```
@@ -52,8 +53,9 @@ Dropped 1 node (cum <= 2.56MB)
          0     0% 99.64%   511.29MB   100%  main.main
          0     0% 99.64%   511.29MB   100%  runtime.main
 ```
-Execution time is ~14m10s
+Execution time is ~12m10s
 
+[prof.svg](resources/roaring-pprof.svg)
 
 ### Concurrent solution:
 ```
@@ -70,7 +72,9 @@ Dropped 8 nodes (cum <= 10.39MB)
          0     0% 99.69%  2074.84MB 99.88%  main.(*IPCounterConcurrent).AddConcurrent
          0     0% 99.69%  2074.84MB 99.88%  main.ProcessFileConcurrency.func2
 ```
-Execution time is ~21m10s
+Execution time is ~18m10s
+
+[prof.svg](resources/concurrent-pprof.svg)
 
 Solution is slower but at least uses more memory! :(((
 
