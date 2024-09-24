@@ -1,22 +1,33 @@
 # Counting IP
 
-Small tool to read uniq IP from text file.
-We have three options: regular bitmap vs roaring bitmap using library vs .
+A small tool to read unique IPs from a text file.
+We have three options: regular bitmap vs Roaring bitmap using a library vs a concurrent solution based on Roaring bitmap.
+The concurrent solution isn't good for this task because it's an I/O-bound task, and we need to minimize memory usage.
+But just for fun, I've implemented it.
 
-
-## Run couning
+## Run counting
 ```bash
 ARGS="-filename <path_to_file>" make run
 ```
+Or a more complicated example:
+```bash
+ARGS="-profile -concurrency <amount of workers> --filename <path_to_file>  -algo <algoritm>" make run
+
+-profile : - enable profiling
+-concurrency : - amount of workers for concurrent solution. Makes sense only for concurrent solution
+-algo : 0 - bitmap 1 - roaring bitmap 2 - concurrent
+
+````
 
 ## Run tests
 ```bash
 GENERATED_IPS=500000 make test
 ```
 
-## Memory consuming
-(Apple M1)
-Regular bitmap:
+## Memory Consumption
+(Apple M1) 100 GB File
+
+### Regular bitmap:
 ```
 Showing nodes accounting for 512MB, 100% of 512MB total
       flat  flat%   sum%        cum   cum%
@@ -24,24 +35,43 @@ Showing nodes accounting for 512MB, 100% of 512MB total
          0     0%   100%      512MB   100%  main.main
          0     0%   100%      512MB   100%  runtime.main
 ```
-Execution time is ~10m19s
+Execution time is ~10m01s
 
-Roaring bitmap:
+### Roaring bitmap:
 ```
-Showing nodes accounting for 17024.55kB, 100% of 17024.55kB total
-Showing top 10 nodes out of 17
+Showing nodes accounting for 509.45MB, 99.64% of 511.29MB total
+Dropped 1 node (cum <= 2.56MB)
       flat  flat%   sum%        cum   cum%
-15480.31kB 90.93% 90.93% 15480.31kB 90.93%  github.com/RoaringBitmap/roaring/v2.newBitmapContainer (inline)
- 1032.02kB  6.06% 96.99% 16512.33kB 96.99%  github.com/RoaringBitmap/roaring/v2.(*arrayContainer).iaddReturnMinimized
-  512.22kB  3.01%   100%   512.22kB  3.01%  runtime.malg
-         0     0%   100% 16512.33kB 96.99%  github.com/RoaringBitmap/roaring/v2.(*Bitmap).Add
-         0     0%   100% 15480.31kB 90.93%  github.com/RoaringBitmap/roaring/v2.(*arrayContainer).toBitmapContainer
-         0     0%   100% 16512.33kB 96.99%  main.(*IPCounterRoaring).Add
-         0     0%   100% 16512.33kB 96.99%  main.ProcessFile
-         0     0%   100% 16512.33kB 96.99%  main.main
-         0     0%   100%   512.22kB  3.01%  runtime.allocm
-         0     0%   100% 16512.33kB 96.99%  runtime.main
+  509.45MB 99.64% 99.64%   509.45MB 99.64%  github.com/RoaringBitmap/roaring/v2.newBitmapContainer (inline)
+         0     0% 99.64%   511.29MB   100%  github.com/RoaringBitmap/roaring/v2.(*Bitmap).Add
+         0     0% 99.64%   509.45MB 99.64%  github.com/RoaringBitmap/roaring/v2.(*arrayContainer).iaddReturnMinimized
+         0     0% 99.64%   509.45MB 99.64%  github.com/RoaringBitmap/roaring/v2.(*arrayContainer).toBitmapContainer
+         0     0% 99.64%   511.29MB   100%  github.com/RoaringBitmap/roaring/v2/roaring64.(*Bitmap).Add
+         0     0% 99.64%   511.29MB   100%  main.(*IPCounterRoaring).Add
+         0     0% 99.64%   511.29MB   100%  main.ProcessFile
+         0     0% 99.64%   511.29MB   100%  main.main
+         0     0% 99.64%   511.29MB   100%  runtime.main
 ```
 Execution time is ~14m10s
 
 
+### Concurrent solution:
+```
+(pprof) top
+Showing nodes accounting for 2071.03MB, 99.69% of 2077.38MB total
+Dropped 8 nodes (cum <= 10.39MB)
+      flat  flat%   sum%        cum   cum%
+ 2071.03MB 99.69% 99.69%  2071.03MB 99.69%  github.com/RoaringBitmap/roaring/v2.newBitmapContainer (inline)
+         0     0% 99.69%  2074.84MB 99.88%  github.com/RoaringBitmap/roaring/v2.(*Bitmap).AddMany
+         0     0% 99.69%   888.15MB 42.75%  github.com/RoaringBitmap/roaring/v2.(*Bitmap).addwithptr
+         0     0% 99.69%  2071.03MB 99.69%  github.com/RoaringBitmap/roaring/v2.(*arrayContainer).iaddReturnMinimized
+         0     0% 99.69%  2071.03MB 99.69%  github.com/RoaringBitmap/roaring/v2.(*arrayContainer).toBitmapContainer
+         0     0% 99.69%  2074.84MB 99.88%  github.com/RoaringBitmap/roaring/v2/roaring64.(*Bitmap).AddMany
+         0     0% 99.69%  2074.84MB 99.88%  main.(*IPCounterConcurrent).AddConcurrent
+         0     0% 99.69%  2074.84MB 99.88%  main.ProcessFileConcurrency.func2
+```
+Execution time is ~21m10s
+
+Solution is slower but at least uses more memory! :(((
+
+It's much better with a smaller file. Need to investigate more.

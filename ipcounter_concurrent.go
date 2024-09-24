@@ -1,18 +1,18 @@
 package main
 
 import (
-	"github.com/RoaringBitmap/roaring/v2"
+	"github.com/RoaringBitmap/roaring/v2/roaring64"
 )
 
 type IPCounterConcurrent struct {
-	bitmap      []*roaring.Bitmap
+	bitmap      []*roaring64.Bitmap
 	concurrency int
 }
 
 func NewBitmapConcurrent(concurrency int) *IPCounterConcurrent {
-	bitmaps := make([]*roaring.Bitmap, concurrency)
+	bitmaps := make([]*roaring64.Bitmap, concurrency)
 	for i := 0; i < concurrency; i++ {
-		bitmaps[i] = roaring.NewBitmap()
+		bitmaps[i] = roaring64.NewBitmap()
 	}
 	return &IPCounterConcurrent{
 		bitmap:      bitmaps,
@@ -20,15 +20,15 @@ func NewBitmapConcurrent(concurrency int) *IPCounterConcurrent {
 	}
 }
 
-func (ipc *IPCounterConcurrent) AddConcurrent(ipAddrRepresentation *[]uint32, workerId int) {
+func (ipc *IPCounterConcurrent) AddConcurrent(ipAddrRepresentation *[]uint64, workerId int) {
 	ipc.bitmap[workerId].AddMany(*ipAddrRepresentation)
 }
 
-func (ipc *IPCounterConcurrent) Add(ipAddrRepresentation uint32) {
+func (ipc *IPCounterConcurrent) Add(ipAddrRepresentation uint64) {
 	// empty
 }
 
 func (ipc *IPCounterConcurrent) Count() uint64 {
-	combineBitMap := roaring.ParOr(ipc.concurrency, ipc.bitmap...)
+	combineBitMap := roaring64.ParOr(ipc.concurrency, ipc.bitmap...)
 	return combineBitMap.GetCardinality()
 }

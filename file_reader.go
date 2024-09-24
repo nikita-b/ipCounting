@@ -12,16 +12,12 @@ import (
 	"sync"
 )
 
-func parseIP(ipStr string) (uint32, error) {
-	ip := net.ParseIP(ipStr)
+func parseIP(ipStr string) (uint64, error) {
+	ip := net.ParseIP(ipStr).To4()
 	if ip == nil {
-		return 0, fmt.Errorf("invalid IPv4: %s", ipStr)
+		return 0, fmt.Errorf("invalid IPv4 address: %s", ipStr)
 	}
-	ipv4 := ip.To4()
-	if ipv4 == nil {
-		return 0, fmt.Errorf("not an IPv4 address: %s", ipStr)
-	}
-	return binary.BigEndian.Uint32(ipv4), nil
+	return uint64(binary.BigEndian.Uint32(ip)), nil
 }
 
 //func parseIP(ip string) (uint32, error) {
@@ -67,10 +63,10 @@ func ProcessFile(ipc IPCounter, file *os.File, progress *ProgressTracker) error 
 }
 
 func ProcessFileConcurrency(ipc IPCounter, file *os.File, progress *ProgressTracker, concurrency int) error {
-	ipAddrQueue := make(chan uint32, 10000) // ~4MB
+	ipAddrQueue := make(chan uint64, 5000000) // ~40MB
 
 	go func() {
-		reader := bufio.NewReaderSize(file, 1<<10)
+		reader := bufio.NewReaderSize(file, 256*1024)
 		defer close(ipAddrQueue)
 		for {
 			line, err := reader.ReadString('\n')
@@ -80,7 +76,7 @@ func ProcessFileConcurrency(ipc IPCounter, file *os.File, progress *ProgressTrac
 			if err == io.EOF {
 				break
 			}
-			progress.bytesRead = progress.bytesRead + int64(len(line))
+			progress.Increase(int64(len(line)))
 
 			ipAddrStr := strings.Trim(line, "\n")
 			ipAddr, err := parseIP(ipAddrStr)
@@ -98,7 +94,7 @@ func ProcessFileConcurrency(ipc IPCounter, file *os.File, progress *ProgressTrac
 		go func() {
 			defer wg.Done()
 			batchSize := 100
-			batch := make([]uint32, 0, batchSize) // Batch size of 100
+			batch := make([]uint64, 0, batchSize) // Batch size of 100
 			for ipInt := range ipAddrQueue {
 				batch = append(batch, ipInt)
 				if len(batch) >= batchSize {
