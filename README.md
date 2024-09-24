@@ -12,11 +12,11 @@ ARGS="-filename <path_to_file>" make run
 Or a more complicated example:
 ```bash
 ARGS="-profile -concurrency <amount of workers> --filename <path_to_file>  -algo <algoritm>" make run
-
+-filename : - path to file with ips
 -profile : - enable profiling
 -concurrency : - amount of workers for concurrent solution. Makes sense only for concurrent solution
 -algo : 0 - bitmap 1 - roaring bitmap 2 - concurrent
-
+-disableProgress : - disable progress bar for performance testing
 ````
 
 ## Run tests
