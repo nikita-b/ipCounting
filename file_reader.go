@@ -8,7 +8,6 @@ import (
 	"log"
 	"net"
 	"os"
-	"strings"
 	"sync"
 )
 
@@ -119,9 +118,7 @@ func ProcessFileConcurrency(ipc IPCounter, filePath string, concurrency int) err
 
 	for i := 0; i < concurrency; i++ {
 		startOffset := int64(i) * chunkSize
-		var endOffset int64
-		endOffset = startOffset + chunkSize
-
+		var endOffset = startOffset + chunkSize
 		wg.Add(1)
 		go func(workerID int, startOffset, endOffset int64) {
 			defer wg.Done()
@@ -165,26 +162,21 @@ func processChunk(ipc IPCounter, filePath string, workerID int, startOffset, end
 		if bytesRead >= endOffset {
 			break
 		}
-		line, err := reader.ReadString('\n')
-		if err != nil && err != io.EOF {
-			return err
-		}
-		bytesRead += int64(len(line))
-
-		if len(line) == 0 {
+		line, err := IPAddressReader(reader)
+		if err != nil {
 			if err == io.EOF {
 				break
 			}
-			continue
+			panic(err)
 		}
-
-		ipAddrStr := strings.TrimSpace(line)
-		ipAddr, err := parseIP(ipAddrStr)
+		ipInt, err := ipToUint32(line)
 		if err != nil {
-			log.Printf("Can't parse IP address: %s. Err: %s", ipAddrStr, err)
+			log.Printf("Can't parse IP address: %s. Err: %s", ipInt, err)
 			continue
 		}
-		batch = append(batch, ipAddr)
+		bytesRead += int64(len(line))
+
+		batch = append(batch, ipInt)
 		if len(batch) >= readerBatchSize {
 			ipc.AddConcurrent(&batch, workerID)
 			batch = make([]uint32, 0, readerBatchSize)
