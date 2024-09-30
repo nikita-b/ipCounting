@@ -81,7 +81,7 @@ func main() {
 			log.Fatalf("Error processing file: %v\n", err)
 		}
 	} else {
-		err = ProcessFileConcurrency(ipCounter, file, progress, *concurrency)
+		err = ProcessFileConcurrency(ipCounter, *filename, *concurrency)
 		if err != nil {
 			log.Fatalf("Error processing file: %v\n", err)
 		}

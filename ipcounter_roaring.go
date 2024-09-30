@@ -1,24 +1,24 @@
 package main
 
 import (
-	"github.com/RoaringBitmap/roaring/v2/roaring64"
+	"github.com/RoaringBitmap/roaring/v2"
 )
 
 type IPCounterRoaring struct {
-	bitmap *roaring64.Bitmap
+	bitmap *roaring.Bitmap
 }
 
 func NewBitmapRoaringIPCounter() *IPCounterRoaring {
 	return &IPCounterRoaring{
-		bitmap: roaring64.NewBitmap(),
+		bitmap: roaring.NewBitmap(),
 	}
 }
 
-func (ipc *IPCounterRoaring) Add(ipAddrRepresentation uint64) {
-	ipc.bitmap.Add(ipAddrRepresentation)
+func (ipc *IPCounterRoaring) Add(ipAddrRepresentation *uint32) {
+	ipc.bitmap.Add(*ipAddrRepresentation)
 }
 
-func (ipc *IPCounterRoaring) AddConcurrent(ipAddrRepresentation *[]uint64, workerId int) {
+func (ipc *IPCounterRoaring) AddConcurrent(ipAddrRepresentation *[]uint32, workerId int) {
 	// empty
 }
 

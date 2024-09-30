@@ -12,12 +12,12 @@ import (
 	"sync"
 )
 
-func parseIP(ipStr string) (uint64, error) {
+func parseIP(ipStr string) (uint32, error) {
 	ip := net.ParseIP(ipStr).To4()
 	if ip == nil {
 		return 0, fmt.Errorf("invalid IPv4 address: %s", ipStr)
 	}
-	return uint64(binary.BigEndian.Uint32(ip)), nil
+	return binary.BigEndian.Uint32(ip), nil
 }
 
 //func parseIP(ip string) (uint32, error) {
@@ -40,71 +40,163 @@ func parseIP(ipStr string) (uint64, error) {
 //	return ipInt, nil
 //}
 
-func ProcessFile(ipc IPCounter, file *os.File, progress *ProgressTracker) error {
-	scanner := bufio.NewScanner(file)
-	buf := make([]byte, 0, 64*1024)
-	scanner.Buffer(buf, 1024*1024)
-
-	for scanner.Scan() {
-		line := scanner.Text()
-
-		ipAddrStr := strings.Trim(line, "\n")
-		ipAddr, err := parseIP(ipAddrStr)
+func IPAddressReader(reader *bufio.Reader) ([]byte, error) {
+	var line []byte
+	for {
+		chunk, isPrefix, err := reader.ReadLine()
 		if err != nil {
-			log.Printf("Can't parse IP address: %s. Err: %s", ipAddrStr, err)
+			return nil, err
+		}
+		line = append(line, chunk...)
+		if !isPrefix {
+			break
+		}
+	}
+	return line, nil
+}
+
+func ipToUint32(ip []byte) (uint32, error) {
+	var result uint32
+	var num uint32
+	var shift uint = 24
+
+	start := 0
+	for i := 0; i <= len(ip); i++ {
+		if i == len(ip) || ip[i] == '.' {
+			if start == i {
+				return 0, fmt.Errorf("empty octet")
+			}
+			num = 0
+			for j := start; j < i; j++ {
+				if ip[j] < '0' || ip[j] > '9' {
+					return 0, fmt.Errorf("invalid character in IP")
+				}
+				num = num*10 + uint32(ip[j]-'0')
+			}
+			if num > 255 {
+				return 0, fmt.Errorf("octet value out of range")
+			}
+			result |= num << shift
+			shift -= 8
+			start = i + 1
+		}
+	}
+	return result, nil
+}
+
+func ProcessFile(ipc IPCounter, file *os.File, progress *ProgressTracker) error {
+	reader := bufio.NewReader(file)
+
+	for {
+		line, err := IPAddressReader(reader)
+		if err != nil {
+			if err == io.EOF {
+				break
+			}
+			panic(err)
+		}
+
+		ipInt, err := ipToUint32(line)
+		if err != nil {
+			fmt.Printf("Error parsing IP %s: %v\n", string(line), err)
 			continue
 		}
-		ipc.Add(ipAddr)
+		ipc.Add(&ipInt)
 		progress.Increase(int64(len(line)))
 	}
 	return nil
 }
 
-func ProcessFileConcurrency(ipc IPCounter, file *os.File, progress *ProgressTracker, concurrency int) error {
-	ipAddrQueue := make(chan uint64, 5000000) // ~40MB
+func ProcessFileConcurrency(ipc IPCounter, filePath string, concurrency int) error {
+	fileStat, err := os.Stat(filePath)
+	if err != nil {
+		return err
+	}
+	fileSize := fileStat.Size()
+	chunkSize := fileSize / int64(concurrency)
 
-	go func() {
-		reader := bufio.NewReaderSize(file, 256*1024)
-		defer close(ipAddrQueue)
-		for {
-			line, err := reader.ReadString('\n')
-			if err != nil && err != io.EOF {
-				log.Fatalf("Error reading file: %v", err)
-			}
-			if err == io.EOF {
-				break
-			}
-			progress.Increase(int64(len(line)))
-
-			ipAddrStr := strings.Trim(line, "\n")
-			ipAddr, err := parseIP(ipAddrStr)
-			if err != nil {
-				log.Printf("Can't parse IP address: %s. Err: %s", ipAddrStr, err)
-				continue
-			}
-			ipAddrQueue <- ipAddr
-		}
-	}()
 	var wg sync.WaitGroup
 
 	for i := 0; i < concurrency; i++ {
+		startOffset := int64(i) * chunkSize
+		var endOffset int64
+		endOffset = startOffset + chunkSize
+
 		wg.Add(1)
-		go func() {
+		go func(workerID int, startOffset, endOffset int64) {
 			defer wg.Done()
-			batchSize := 100
-			batch := make([]uint64, 0, batchSize) // Batch size of 100
-			for ipInt := range ipAddrQueue {
-				batch = append(batch, ipInt)
-				if len(batch) >= batchSize {
-					ipc.AddConcurrent(&batch, i)
-					batch = batch[:0]
-				}
+			err := processChunk(ipc, filePath, workerID, startOffset, endOffset)
+			if err != nil {
+				log.Printf("Worker %d has error: %v", workerID, err)
 			}
-			if len(batch) > 0 {
-				ipc.AddConcurrent(&batch, i)
-			}
-		}()
+		}(i, startOffset, endOffset)
 	}
 	wg.Wait()
+	return nil
+}
+
+func processChunk(ipc IPCounter, filePath string, workerID int, startOffset, endOffset int64) error {
+	file, err := os.Open(filePath)
+	if err != nil {
+		return err
+	}
+	defer file.Close()
+
+	_, err = file.Seek(startOffset, io.SeekStart)
+	if err != nil {
+		return err
+	}
+
+	reader := bufio.NewReaderSize(file, 2048*2048)
+	bytesRead := startOffset
+
+	if startOffset != 0 {
+		line, err := reader.ReadString('\n')
+		if err != nil && err != io.EOF {
+			return err
+		}
+		bytesRead += int64(len(line))
+	}
+
+	readerBatchSize := 2048
+	batch := make([]uint32, 0, readerBatchSize)
+
+	for {
+		if bytesRead >= endOffset {
+			break
+		}
+		line, err := reader.ReadString('\n')
+		if err != nil && err != io.EOF {
+			return err
+		}
+		bytesRead += int64(len(line))
+
+		if len(line) == 0 {
+			if err == io.EOF {
+				break
+			}
+			continue
+		}
+
+		ipAddrStr := strings.TrimSpace(line)
+		ipAddr, err := parseIP(ipAddrStr)
+		if err != nil {
+			log.Printf("Can't parse IP address: %s. Err: %s", ipAddrStr, err)
+			continue
+		}
+		batch = append(batch, ipAddr)
+		if len(batch) >= readerBatchSize {
+			ipc.AddConcurrent(&batch, workerID)
+			batch = make([]uint32, 0, readerBatchSize)
+		}
+
+		if err == io.EOF {
+			break
+		}
+	}
+
+	if len(batch) > 0 {
+		ipc.AddConcurrent(&batch, workerID)
+	}
 	return nil
 }
